@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<server>
+    <webserver port="7999">
+        <initial_admin>
+            <username>admin</username>
+            <passphrase>changeme</passphrase>
+        </initial_admin>
+    </webserver>
+    <game description="Farming Simulator 25" name="FarmingSimulator2025" exe="FarmingSimulator2025Game.exe">
+        <imprint active="false"><![CDATA[]]></imprint>
+        <logos>
+            <login>template/loginLogo.jpg</login>
+            <bottom>template/bottomLogo.jpg</bottom>
+        </logos>
+    </game>
+</server>

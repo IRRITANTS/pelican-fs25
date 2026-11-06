@@ -1,0 +1,277 @@
+{
+    "_comment": "Farming Simulator 25 dedicated server (wine) for Pelican",
+    "meta": {
+        "version": "PLCN_v3",
+        "update_url": "https://raw.githubusercontent.com/IRRITANTS/pelican-fs25/main/egg/egg-farming-simulator-25.json"
+    },
+    "exported_at": "2026-11-06T12:00:00+00:00",
+    "name": "Farming Simulator 25",
+    "author": "33460433+IRRITANTS@users.noreply.github.com",
+    "uuid": "f2d580bd-7040-41f2-9f86-9eee957beb73",
+    "description": "Farming Simulator 25 dedicated server under wine. Steam copy (default): log in once over noVNC, the game downloads and updates by itself. GIANTS copy: install with your own key over noVNC. Web admin, saving on stop, game log in the console. Needs its own game licence (a second Steam account or a separate GIANTS key). Not affiliated with GIANTS Software.",
+    "icon": null,
+    "tags": ["farming-simulator", "fs25", "wine"],
+    "features": [],
+    "docker_images": {
+        "FS25 (wine)": "ghcr.io/irritants/pelican-fs25:latest"
+    },
+    "file_denylist": [],
+    "startup_commands": {
+        "Default": "/usr/local/bin/fs25-pelican"
+    },
+    "config": {
+        "files": "{}",
+        "startup": "{\n    \"done\": \"[pelican] FS25 server is running\"\n}",
+        "logs": "{}",
+        "stop": "stop"
+    },
+    "scripts": {
+        "installation": {
+            "script": "#!/bin/bash\n# FS25 (Pelican) install script. Runs as root in the installer container, volume at /mnt/server.\n# Never deletes game, config or saves: safe to use with \"Reinstall\".\n# Setup in the game container needs installer/Setup.exe (or FarmingSimulator2025.exe) and DLC as .exe,\n# so archives (.img/.iso/.zip/.7z) found in installer/ and dlc/ are extracted here.\nset -u\nshopt -s nullglob nocaseglob\ncd /mnt/server || exit 1\n\nmkdir -p game dlc installer tmp logs config/FarmingSimulator2025/mods config/.pelican\necho \"[install] folders ready: game/ dlc/ installer/ config/ (mods: config/FarmingSimulator2025/mods)\"\n\nneed=\"\"\ncommand -v curl \u003e/dev/null 2\u003e\u00261 || need=\"$need curl ca-certificates\"\ncommand -v 7z \u003e/dev/null 2\u003e\u00261 || need=\"$need p7zip-full\"\nif [ -n \"$need\" ]; then\n  apt-get update -qq \u0026\u0026 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq $need \u003e/dev/null \\\n    || { echo \"[install] ERROR: could not install:$need\"; exit 1; }\nfi\n\nif [ \"${GAME_SOURCE:-giants}\" = steam ]; then\n  if [ -n \"$(find steam-prefix/drive_c -maxdepth 3 -iname steam.exe 2\u003e/dev/null | head -n1)\" ]; then\n    echo \"[install] Steam is already installed in steam-prefix/ (login, game and saves are kept).\"\n    echo \"[install] Game updates are installed automatically on every start (SERVER_MODE=server).\"\n    exit 0\n  fi\n  if [ ! -f installer/SteamSetup.exe ]; then\n    echo \"[install] downloading SteamSetup.exe (official Valve CDN)...\"\n    curl -fL --retry 3 -s -o installer/SteamSetup.exe.part https://cdn.akamai.steamstatic.com/client/installer/SteamSetup.exe \\\n      \u0026\u0026 mv installer/SteamSetup.exe.part installer/SteamSetup.exe \\\n      || { echo \"[install] WARN: download failed, the Steam icon will retry it\"; rm -f installer/SteamSetup.exe.part; }\n  fi\n  echo \"[install] GAME_SOURCE=steam: no GIANTS files needed.\"\n  echo \"[install] Next: SERVER_MODE=server, start the server. The console shows a noVNC link for the one-time Steam login,\"\n  echo \"[install] then Steam downloads the game (progress in the console) and the server starts by itself.\"\n  exit 0\nfi\n\nif [ -n \"${INSTALLER_URL:-}\" ]; then\n  # file name from the URL path (query string may contain tokens, never printed)\n  url_path=\"${INSTALLER_URL%%\\?*}\"\n  name=\"$(basename \"$url_path\")\"\n  [ -n \"$name\" ] \u0026\u0026 [ \"$name\" != \"/\" ] || name=\"fs25-installer.zip\"\n  host=\"$(printf \u0027%s\u0027 \"$INSTALLER_URL\" | sed -E \u0027s#^[a-zA-Z]+://([^/@]*@)?([^/:?]+).*#\\2#\u0027)\"\n  if [ -f \"installer/$name\" ] || [ -f \"installer/.extracted-$name\" ]; then\n    echo \"[install] $name already downloaded, skipping\"\n  else\n    echo \"[install] downloading $name from $host ...\"\n    curl -fL --retry 3 --progress-bar -o \"installer/$name.part\" \"$INSTALLER_URL\" \\\n      || { echo \"[install] ERROR: download failed\"; rm -f \"installer/$name.part\"; exit 1; }\n    mv \"installer/$name.part\" \"installer/$name\"\n  fi\nfi\n\n# extract \u003carchive\u003e \u003cdest\u003e; keeps a marker so Reinstall does not extract twice\nextract() {\n  local a=$1 dest=$2 base marker\n  base=\"$(basename \"$a\")\"\n  marker=\"$(dirname \"$a\")/.extracted-$base\"\n  [ -f \"$marker\" ] \u0026\u0026 { echo \"[install] $base already extracted\"; return 0; }\n  echo \"[install] extracting $base -\u003e $dest/\"\n  mkdir -p \"tmp/x\" \u0026\u0026 rm -rf tmp/x/*\n  if ! 7z x -y -bso0 -bsp0 -otmp/x \"$a\"; then\n    echo \"[install] ERROR: extraction of $base failed\"; rm -rf tmp/x; return 1\n  fi\n  cp -a tmp/x/. \"$dest/\" \u0026\u0026 rm -rf tmp/x \u0026\u0026 touch \"$marker\"\n}\n\nfor a in installer/*.img installer/*.iso installer/*.zip installer/*.7z; do\n  extract \"$a\" installer || exit 1\ndone\n\n# installer files may sit in a subfolder of the archive\nif [ ! -f installer/Setup.exe ] \u0026\u0026 [ ! -f installer/FarmingSimulator2025.exe ]; then\n  inner=\"$(find installer -mindepth 2 -maxdepth 4 \\( -iname \u0027Setup.exe\u0027 -o -iname \u0027FarmingSimulator2025.exe\u0027 \\) | head -n1)\"\n  if [ -n \"$inner\" ]; then\n    echo \"[install] moving installer files from $(dirname \"$inner\") to installer/\"\n    cp -a \"$(dirname \"$inner\")\"/. installer/\n  fi\nfi\n\n# DLC: flatten every .exe from archives into dlc/\nfor a in dlc/*.img dlc/*.iso dlc/*.zip dlc/*.7z; do\n  base=\"$(basename \"$a\")\"\n  [ -f \"dlc/.extracted-$base\" ] \u0026\u0026 continue\n  mkdir -p tmp/dlc \u0026\u0026 rm -rf tmp/dlc/*\n  echo \"[install] extracting DLC $base\"\n  if 7z x -y -bso0 -bsp0 -otmp/dlc \"$a\"; then\n    find tmp/dlc -type f -iname \u0027*.exe\u0027 -exec mv -f {} dlc/ \\;\n    touch \"dlc/.extracted-$base\"\n  else\n    echo \"[install] WARN: could not extract $base\"\n  fi\n  rm -rf tmp/dlc\ndone\n\nif [ -f installer/Setup.exe ] || [ -f installer/FarmingSimulator2025.exe ]; then\n  echo \"[install] installer is ready.\"\nelse\n  echo \"[install] No game installer yet. Upload the game (FarmingSimulator25_*_ESD.img/.zip or the extracted files)\"\n  echo \"[install] to installer/ and DLC to dlc/ via SFTP or the file manager, then press Reinstall to extract them.\"\nfi\nfor f in dlc/*.exe; do echo \"[install] DLC: $(basename \"$f\")\"; done\necho \"[install] done. Next: SERVER_MODE=install, start the server, run Setup over noVNC.\"\n",
+            "container": "ghcr.io/parkervcp/installers:debian",
+            "entrypoint": "bash"
+        }
+    },
+    "variables": [
+        {
+            "name": "Mode",
+            "description": "server = dedicated server + web admin (with GAME_SOURCE=steam it also installs Steam, waits for the Steam login over noVNC when needed, downloads/updates the game with a progress bar, then starts). install = desktop over noVNC for manual work (GIANTS Setup, or Steam by hand); game server not started. web_only = web admin only.",
+            "env_variable": "SERVER_MODE",
+            "default_value": "server",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["required", "in:install,server,web_only"],
+            "sort": 1
+        },
+        {
+            "name": "Game source",
+            "description": "steam = Steam copy on a separate Steam account for the server: with SERVER_MODE=server log in once over noVNC when the console asks, the rest is automatic. giants = GIANTS key + game image in installer/ (SERVER_MODE=install, Setup over noVNC).",
+            "env_variable": "GAME_SOURCE",
+            "default_value": "steam",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["required", "in:giants,steam"],
+            "sort": 0
+        },
+        {
+            "name": "Server name",
+            "description": "Name shown in the in-game server browser.",
+            "env_variable": "SERVER_NAME",
+            "default_value": "FS25 Server",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["required", "string", "max:64"],
+            "sort": 2
+        },
+        {
+            "name": "Join password",
+            "description": "Password players need to join. Empty = open server.",
+            "env_variable": "SERVER_PASSWORD",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["nullable", "string", "max:32"],
+            "sort": 3
+        },
+        {
+            "name": "In-game admin password",
+            "description": "Admin password inside the game. Empty = a random one is generated on first start and saved to config/.pelican/generated-secrets.env.",
+            "env_variable": "SERVER_ADMIN",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["nullable", "string", "min:4", "max:32"],
+            "sort": 4
+        },
+        {
+            "name": "Slots",
+            "description": "Maximum number of players.",
+            "env_variable": "SERVER_PLAYERS",
+            "default_value": "16",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["required", "integer", "between:1,16"],
+            "sort": 5
+        },
+        {
+            "name": "Language / region",
+            "description": "Server language: en, de, jp, pl, cz, fr, es, ru, it, pt, hu, nl, cs, ct, br, tr, ro, kr, ea, da, fi, no, sv, fc.",
+            "env_variable": "SERVER_REGION",
+            "default_value": "en",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["required", "in:en,de,jp,pl,cz,fr,es,ru,it,pt,hu,nl,cs,ct,br,tr,ro,kr,ea,da,fi,no,sv,fc"],
+            "sort": 6
+        },
+        {
+            "name": "Map",
+            "description": "Map ID written to <mapID> (default MapUS = Riverbend Springs). Check the exact IDs of the other base maps and of mod maps in the web admin map list. MapFR/MapAlpine from the upstream README are FS22 names.",
+            "env_variable": "SERVER_MAP",
+            "default_value": "MapUS",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["required", "string", "max:128"],
+            "sort": 7
+        },
+        {
+            "name": "Difficulty",
+            "description": "Economic difficulty for a new savegame: 1 = easy, 2 = normal, 3 = hard. Written to <economicDifficulty>.",
+            "env_variable": "SERVER_DIFFICULTY",
+            "default_value": "3",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["required", "in:1,2,3"],
+            "sort": 8
+        },
+        {
+            "name": "Pause when empty",
+            "description": "2 = pause when no players are connected, 1 = never pause.",
+            "env_variable": "SERVER_PAUSE",
+            "default_value": "2",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["required", "in:1,2"],
+            "sort": 9
+        },
+        {
+            "name": "Autosave interval",
+            "description": "Autosave interval in seconds (e.g. 180.000000).",
+            "env_variable": "SERVER_SAVE_INTERVAL",
+            "default_value": "180.000000",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["required", "numeric"],
+            "sort": 10
+        },
+        {
+            "name": "Stats interval",
+            "description": "Statistics interval in seconds.",
+            "env_variable": "SERVER_STATS_INTERVAL",
+            "default_value": "31536000",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["required", "numeric"],
+            "sort": 11
+        },
+        {
+            "name": "Crossplay",
+            "description": "Allow console/crossplay players.",
+            "env_variable": "SERVER_CROSSPLAY",
+            "default_value": "true",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["required", "in:true,false"],
+            "sort": 12
+        },
+        {
+            "name": "Web admin login",
+            "description": "Username for the FS25 web admin.",
+            "env_variable": "WEB_USERNAME",
+            "default_value": "admin",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["required", "string", "max:32"],
+            "sort": 13
+        },
+        {
+            "name": "Web admin password",
+            "description": "Password for the FS25 web admin. Empty = a random one is generated on first start and saved to config/.pelican/generated-secrets.env.",
+            "env_variable": "WEB_PASSWORD",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["nullable", "string", "min:6", "max:64"],
+            "sort": 14
+        },
+        {
+            "name": "Web admin port",
+            "description": "Must equal the port of an additional allocation of this server.",
+            "env_variable": "WEB_PORT",
+            "default_value": "7999",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["required", "integer", "between:1024,65535"],
+            "sort": 16
+        },
+        {
+            "name": "VNC password",
+            "description": "noVNC password, 6-8 characters (TigerVNC uses only the first 8). Empty = generated and saved to config/.pelican/generated-secrets.env.",
+            "env_variable": "VNC_PASSWORD",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["nullable", "string", "min:6", "max:8"],
+            "sort": 17
+        },
+        {
+            "name": "noVNC port",
+            "description": "Must equal the port of an additional allocation of this server. Not 5900 (used internally).",
+            "env_variable": "VNC_PORT",
+            "default_value": "6080",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["required", "integer", "between:1024,65535", "not_in:5900"],
+            "sort": 18
+        },
+        {
+            "name": "VNC in server mode",
+            "description": "Also start noVNC in server/web_only mode (to watch the wine desktop).",
+            "env_variable": "ENABLE_VNC",
+            "default_value": "false",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["required", "in:true,false"],
+            "sort": 19
+        },
+        {
+            "name": "Installer URL",
+            "description": "Optional direct link to the game archive (zip/7z/img). Downloaded into installer/ by the install script (Reinstall). Leave empty to upload via SFTP.",
+            "env_variable": "INSTALLER_URL",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["nullable", "url"],
+            "sort": 20
+        },
+        {
+            "name": "Stop timeout",
+            "description": "Seconds to wait for the game to stop via the web admin before wine is killed.",
+            "env_variable": "STOP_TIMEOUT",
+            "default_value": "180",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": ["required", "integer", "between:10,540"],
+            "sort": 21
+        },
+        {
+            "name": "Save on stop",
+            "description": "Save the game before every stop/restart (the web admin's Stop does not save). Installs and activates the small server mod FS25_PelicanSave; players download it automatically when joining. Console command 'save' saves at any time.",
+            "env_variable": "SAVE_ON_STOP",
+            "default_value": "true",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["required", "in:true,false"],
+            "sort": 22
+        },
+        {
+            "name": "Game log in console",
+            "description": "Show the game's own log (mods, map loading, players, errors) in the console as [game] lines. filtered = without per-file load timings and texture warnings, all = everything, off = only the web admin log.",
+            "env_variable": "GAME_LOG",
+            "default_value": "filtered",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["required", "in:filtered,all,off"],
+            "sort": 23
+        },
+        {
+            "name": "DLC to activate",
+            "description": "none = DLC are switched on/off by hand in the web admin (the choice is kept across restarts). all = switch on every installed DLC before every autostart, or a list like pumpsAndHosesPack,strawHarvestPack. Players can only join if they own every active DLC (DLC are not downloaded from the server, unlike mods). Steam copy: DLC owned by the server account are downloaded by Steam automatically either way.",
+            "env_variable": "SERVER_DLC",
+            "default_value": "none",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": ["required", "string", "max:500", "regex:/^[A-Za-z0-9_., -]+$/"],
+            "sort": 24
+        }
+    ]
+}

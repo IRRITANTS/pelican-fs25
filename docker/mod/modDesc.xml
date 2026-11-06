@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<modDesc descVersion="116">
+    <author>pelican-fs25</author>
+    <version>1.0.0.0</version>
+    <title>
+        <en>Pelican Save on Stop</en>
+        <de>Pelican Speichern beim Stoppen</de>
+    </title>
+    <description>
+        <en><![CDATA[Server helper for the Pelican panel: saves the game before the dedicated server is stopped or restarted. Does nothing on clients.]]></en>
+        <de><![CDATA[Server-Helfer fuer das Pelican-Panel: speichert das Spiel, bevor der Dedicated Server gestoppt oder neu gestartet wird. Auf Clients ohne Funktion.]]></de>
+    </description>
+    <iconFilename>icon_pelicanSave.dds</iconFilename>
+    <multiplayer supported="true" />
+    <extraSourceFiles>
+        <sourceFile filename="PelicanSave.lua" />
+    </extraSourceFiles>
+</modDesc>
