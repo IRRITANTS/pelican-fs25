@@ -135,7 +135,7 @@
         },
         {
             "name": "Autosave interval",
-            "description": "Autosave interval in seconds (e.g. 180.000000).",
+            "description": "Autosave interval in minutes (e.g. 180.000000 = every 3 hours).",
             "env_variable": "SERVER_SAVE_INTERVAL",
             "default_value": "180.000000",
             "user_viewable": true,

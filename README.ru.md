@@ -92,7 +92,7 @@
 | `SERVER_MODE` | `server` | `server`: сервер; `install`: рабочий стол noVNC для ручной работы; `web_only`: только веб-админка |
 | `SERVER_NAME`, `SERVER_PASSWORD`, `SERVER_ADMIN` | | имя в браузере серверов, пароль входа, пароль админа в игре (пустой = сгенерировать) |
 | `SERVER_PLAYERS`, `SERVER_REGION`, `SERVER_MAP`, `SERVER_DIFFICULTY` | 16, en, MapUS, 3 | слоты, язык, карта, экономическая сложность |
-| `SERVER_PAUSE`, `SERVER_SAVE_INTERVAL`, `SERVER_CROSSPLAY` | 2, 180, true | пауза пустого сервера, автосейв (с), кроссплей |
+| `SERVER_PAUSE`, `SERVER_SAVE_INTERVAL`, `SERVER_CROSSPLAY` | 2, 180, true | пауза пустого сервера, автосейв (минуты), кроссплей |
 | `WEB_USERNAME`, `WEB_PASSWORD`, `WEB_PORT` | admin, пусто, 7999 | веб-админка |
 | `VNC_PASSWORD`, `VNC_PORT`, `ENABLE_VNC` | пусто, 6080, false | noVNC; `ENABLE_VNC=true` держит noVNC открытым и в режиме server |
 | `SAVE_ON_STOP` | true | сохранять игру перед остановкой (мод FS25_PelicanSave) |

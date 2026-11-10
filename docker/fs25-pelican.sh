@@ -791,12 +791,31 @@ wait_cmd() {
   done
 }
 
+# The game quits by itself when it loses the GIANTS master server; Stop pressed in the web admin
+# ends the log without this error, so that case is left alone.
+game_lost_master() {
+  local f; f=$(ls -t "$CONFIG_DIR"/log_*.txt 2>/dev/null | head -n1)
+  [[ -n "$f" ]] && tail -n 60 "$f" | grep -aq 'Lost connection to master server'
+}
+
 main_loop() {
+  local game_up=0
   while true; do
     wait_cmd 5
     if [[ -n "$WEB_PID" ]] && ! kill -0 "$WEB_PID" 2>/dev/null; then
       warn "dedicatedServer.exe exited unexpectedly"
       shutdown_all 1
+    fi
+    [[ "$SERVER_MODE" == server && -n "$WEB_PID" ]] || continue
+    if [[ -n "$(game_pid)" ]]; then
+      game_up=1
+    elif (( game_up )); then
+      game_up=0
+      if game_lost_master; then
+        warn "the game shut itself down: lost connection to the GIANTS master server. Starting it again in 60 s"
+        wait_cmd 60
+        start_game && log "game restarted after the master server disconnect"
+      fi
     fi
   done
 }

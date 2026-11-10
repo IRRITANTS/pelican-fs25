@@ -94,7 +94,7 @@ New DLC or an update: put the files into `dlc/`, then `install` → Setup → `s
 | `SERVER_MODE` | `server` | `server`: the server; `install`: noVNC desktop for manual work; `web_only`: web admin only |
 | `SERVER_NAME`, `SERVER_PASSWORD`, `SERVER_ADMIN` | | name in the server browser, join password, in-game admin password (empty = generate) |
 | `SERVER_PLAYERS`, `SERVER_REGION`, `SERVER_MAP`, `SERVER_DIFFICULTY` | 16, en, MapUS, 3 | slots, language, map, economic difficulty |
-| `SERVER_PAUSE`, `SERVER_SAVE_INTERVAL`, `SERVER_CROSSPLAY` | 2, 180, true | pause when empty, autosave (s), crossplay |
+| `SERVER_PAUSE`, `SERVER_SAVE_INTERVAL`, `SERVER_CROSSPLAY` | 2, 180, true | pause when empty, autosave (minutes), crossplay |
 | `WEB_USERNAME`, `WEB_PASSWORD`, `WEB_PORT` | admin, empty, 7999 | web admin |
 | `VNC_PASSWORD`, `VNC_PORT`, `ENABLE_VNC` | empty, 6080, false | noVNC; `ENABLE_VNC=true` keeps noVNC open in server mode too |
 | `SAVE_ON_STOP` | true | save the game before stopping (FS25_PelicanSave mod) |
