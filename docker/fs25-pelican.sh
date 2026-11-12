@@ -802,13 +802,28 @@ game_lost_master() {
   [[ -n "$f" ]] && tail -n 60 "$f" | grep -aq 'Lost connection to master server'
 }
 
+# The web admin fetches something from farming-simulator.com over plain http with no timeout; when that
+# request gets no answer the login page hangs for everyone. Only the node can fix it (README: "Web admin hangs").
+web_admin_hangs() {
+  ! curl -s -m 20 -o /dev/null "http://${WEBSERVER_LISTENING_ON}:${WEB_PORT}/index.html"
+}
+
 main_loop() {
-  local game_up=0
+  local game_up=0 web_probe=$SECONDS web_fails=0
   while true; do
     wait_cmd 5
     if [[ -n "$WEB_PID" ]] && ! kill -0 "$WEB_PID" 2>/dev/null; then
       warn "dedicatedServer.exe exited unexpectedly"
       shutdown_all 1
+    fi
+    if [[ -n "$WEB_PID" && -n "${WEBSERVER_LISTENING_ON:-}" ]] && (( SECONDS - web_probe >= 300 )); then
+      web_probe=$SECONDS
+      if ! web_admin_hangs; then
+        web_fails=0
+      elif (( ++web_fails == 3 )); then
+        warn "the web admin login page has not answered for 15 minutes (the game itself keeps running)."
+        warn "  Usual cause: its http request to farming-simulator.com hangs. Fix on the node: README, section 'Web admin hangs'"
+      fi
     fi
     [[ "$SERVER_MODE" == server && -n "$WEB_PID" ]] || continue
     if [[ -n "$(game_pid)" ]]; then

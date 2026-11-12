@@ -130,6 +130,37 @@ With `SAVE_ON_STOP=false` the script removes this mod from `mods/`.
 
 Console commands: `stop`, `save` (save now, only with `SAVE_ON_STOP=true`), `status`.
 
+## Web admin hangs
+
+Symptom: the login page `http://<ip>:<WEB_PORT>/` does not open, although the game runs and players play. After 15 minutes
+the script prints `the web admin login page has not answered for 15 minutes` in the console.
+
+Cause: the web admin (dedicatedServer.exe) makes a plain-http request (port 80) to farming-simulator.com with no timeout.
+With some providers the answer gets lost and the login page waits for it forever. This cannot be fixed inside the container:
+it needs root on the node. The rule below refuses that request at once, and the web admin keeps working.
+The game, Steam and https to GIANTS are not affected. On the node, as root:
+```bash
+cat >/etc/systemd/system/fs25-giants-http-reject.service <<'EOF'
+[Unit]
+Description=Reject FS25 web admin plain-http requests to farming-simulator.com
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'iptables -C DOCKER-USER -d 176.9.241.236 -p tcp --dport 80 -j REJECT --reject-with tcp-reset 2>/dev/null || iptables -I DOCKER-USER -d 176.9.241.236 -p tcp --dport 80 -j REJECT --reject-with tcp-reset'
+ExecStop=/bin/sh -c 'iptables -D DOCKER-USER -d 176.9.241.236 -p tcp --dport 80 -j REJECT --reject-with tcp-reset 2>/dev/null || true'
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload && systemctl enable --now fs25-giants-http-reject
+```
+If the web admin already hangs, restart the server afterwards. To remove the rule:
+`systemctl disable --now fs25-giants-http-reject && rm /etc/systemd/system/fs25-giants-http-reject.service`.
+Check the address: `getent hosts www.farming-simulator.com` (176.9.241.236 as of 2026-11-12).
+
 ## Console
 
 | Prefix | Source |

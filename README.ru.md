@@ -128,6 +128,37 @@
 
 Консольные команды: `stop`, `save` (сохранить сейчас, только при `SAVE_ON_STOP=true`), `status`.
 
+## Веб-админка зависает
+
+Признак: страница входа `http://<ip>:<WEB_PORT>/` не открывается, хотя игра работает и игроки играют. Через 15 минут
+скрипт пишет в консоль `the web admin login page has not answered for 15 minutes`.
+
+Причина: веб-админка (dedicatedServer.exe) делает запрос на farming-simulator.com по обычному http (порт 80) без ограничения
+по времени. У некоторых провайдеров ответ на этот запрос теряется, и страница входа ждёт его бесконечно. Изнутри контейнера
+это не исправить: нужен root на ноде. Правило ниже отвечает на этот запрос отказом сразу, и веб-админка работает дальше.
+Игра, Steam и https к GIANTS не затрагиваются. На ноде от root:
+```bash
+cat >/etc/systemd/system/fs25-giants-http-reject.service <<'EOF'
+[Unit]
+Description=Reject FS25 web admin plain-http requests to farming-simulator.com
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'iptables -C DOCKER-USER -d 176.9.241.236 -p tcp --dport 80 -j REJECT --reject-with tcp-reset 2>/dev/null || iptables -I DOCKER-USER -d 176.9.241.236 -p tcp --dport 80 -j REJECT --reject-with tcp-reset'
+ExecStop=/bin/sh -c 'iptables -D DOCKER-USER -d 176.9.241.236 -p tcp --dport 80 -j REJECT --reject-with tcp-reset 2>/dev/null || true'
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload && systemctl enable --now fs25-giants-http-reject
+```
+Если веб-админка уже зависла, после этого перезапустите сервер. Убрать правило:
+`systemctl disable --now fs25-giants-http-reject && rm /etc/systemd/system/fs25-giants-http-reject.service`.
+Проверьте адрес: `getent hosts www.farming-simulator.com` (на 12.11.2026 это 176.9.241.236).
+
 ## Консоль
 
 | Префикс | Источник |
