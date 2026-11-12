@@ -245,9 +245,9 @@
         },
         {
             "name": "Save on stop",
-            "description": "Save the game before every stop/restart (the web admin's Stop does not save). Installs and activates the small server mod FS25_PelicanSave; players download it automatically when joining. Console command 'save' saves at any time.",
+            "description": "Save the game before every stop/restart (the web admin's Stop does not save). Installs and activates the small server mod FS25_PelicanSave; players download it automatically when joining. Console command 'save' saves at any time. false (default): no mod, the mod is removed from mods/; the game is saved only by autosave.",
             "env_variable": "SAVE_ON_STOP",
-            "default_value": "true",
+            "default_value": "false",
             "user_viewable": true,
             "user_editable": true,
             "rules": ["required", "in:true,false"],

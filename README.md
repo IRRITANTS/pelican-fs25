@@ -8,7 +8,7 @@ Egg and Docker image for a Farming Simulator 25 dedicated server running under w
   and DLC by itself, installs updates and starts. Download progress is shown in the panel console.
 * **GIANTS copy:** install with your own key via noVNC.
 * All settings are egg variables; the game configs are regenerated on every start.
-* The game is saved before every stop and restart, and the game log (mods, map loading, players) is shown in the Pelican console.
+* The game log (mods, map loading, players) is shown in the Pelican console. Optional: save before every stop (`SAVE_ON_STOP=true`).
 
 > This project is not affiliated with GIANTS Software or Valve. The image does not contain the game: everyone installs their own copy.
 > The server needs a **separate licence**: a second Steam account with its own copy of FS25, or a separate GIANTS key.
@@ -97,7 +97,7 @@ New DLC or an update: put the files into `dlc/`, then `install` → Setup → `s
 | `SERVER_PAUSE`, `SERVER_SAVE_INTERVAL`, `SERVER_CROSSPLAY` | 2, 180, true | pause when empty, autosave (minutes), crossplay |
 | `WEB_USERNAME`, `WEB_PASSWORD`, `WEB_PORT` | admin, empty, 7999 | web admin |
 | `VNC_PASSWORD`, `VNC_PORT`, `ENABLE_VNC` | empty, 6080, false | noVNC; `ENABLE_VNC=true` keeps noVNC open in server mode too |
-| `SAVE_ON_STOP` | true | save the game before stopping (FS25_PelicanSave mod) |
+| `SAVE_ON_STOP` | false | `true`: save the game before stopping (installs the FS25_PelicanSave mod); `false`: no mod |
 | `GAME_LOG` | filtered | game log in the console: `filtered`, `all`, `off` |
 | `SERVER_DLC` | none | `none`: you enable DLC yourself in the web admin; `all`: enable all on autostart; or a list |
 | `INSTALLER_URL` | | direct link to the GIANTS game image for Reinstall |
@@ -114,17 +114,21 @@ Empty passwords are generated on the first start and stored in `config/.pelican/
 
 ## Stopping and saving
 
-The egg's stop command is `stop` (via stdin). The script saves the game, presses Stop in the web admin, closes Steam and wine.
-FS25 itself closes without saving when you press Stop in the web admin, and there is no Save button there. So the image puts a small
-server mod `FS25_PelicanSave` into `mods/` (4 KB, players download it automatically, it does nothing on the client)
-and enables it on autostart. Before stopping, the script asks the mod to save the game and waits for the files to be written (~10 s):
+The egg's stop command is `stop` (via stdin). The script presses Stop in the web admin, closes Steam and wine.
+FS25 itself closes without saving on Stop, and there is no Save button in the web admin. By default (`SAVE_ON_STOP=false`)
+the game is saved only by autosave (`SERVER_SAVE_INTERVAL`, in minutes): anything after the last autosave is lost on stop.
+Use a short interval, e.g. 30.
+
+`SAVE_ON_STOP=true` puts a small server mod `FS25_PelicanSave` into `mods/` (4 KB, players download it automatically,
+it does nothing on the client) and enables it on autostart. Then before stopping, the script asks the mod to save the game
+and waits for the files to be written (~10 s):
 ```
 [pelican] saving the game...
 [pelican] game saved (12s)
 ```
-If you press Stop directly in the web admin, the game closes without saving. Stop the server from Pelican.
+With `SAVE_ON_STOP=false` the script removes this mod from `mods/`.
 
-Console commands: `stop`, `save` (save now), `status`.
+Console commands: `stop`, `save` (save now, only with `SAVE_ON_STOP=true`), `status`.
 
 ## Console
 

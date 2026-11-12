@@ -44,7 +44,7 @@ VNC_PORT="${VNC_PORT:-6080}"
 VNC_GEOMETRY="${VNC_GEOMETRY:-1280x800}"
 ENABLE_VNC="${ENABLE_VNC:-false}"
 STOP_TIMEOUT="${STOP_TIMEOUT:-180}"
-SAVE_ON_STOP="${SAVE_ON_STOP:-true}"
+SAVE_ON_STOP="${SAVE_ON_STOP:-false}"
 SAVE_TIMEOUT="${SAVE_TIMEOUT:-180}"
 GAME_LOG="${GAME_LOG:-filtered}"
 export SERVER_DLC="${SERVER_DLC:-none}"       # DLC activated on autostart: all | none | name,name
@@ -645,9 +645,13 @@ SAVE_MOD_DIR="$CONFIG_DIR/modSettings/FS25_PelicanSave"
 
 install_save_mod() {
   export PELICAN_MOD=""
-  is_true "$SAVE_ON_STOP" || { log "SAVE_ON_STOP=false: the game is not saved on stop, only by autosave"; return 0; }
-  [[ -f "$SAVE_MOD_SRC" ]] || { warn "save mod missing in the image, saving on stop is disabled"; return 0; }
   local dst="$CONFIG_DIR/mods/FS25_PelicanSave.zip"
+  if ! is_true "$SAVE_ON_STOP"; then
+    [[ -f "$dst" ]] && rm -f "$dst" && log "SAVE_ON_STOP=false: removed FS25_PelicanSave from mods/"
+    log "SAVE_ON_STOP=false: the game is not saved on stop, only by autosave"
+    return 0
+  fi
+  [[ -f "$SAVE_MOD_SRC" ]] || { warn "save mod missing in the image, saving on stop is disabled"; return 0; }
   cmp -s "$SAVE_MOD_SRC" "$dst" || cp -f "$SAVE_MOD_SRC" "$dst"
   rm -f "$SAVE_MOD_DIR/status.xml" "$SAVE_MOD_DIR/request.xml"
   export PELICAN_MOD=FS25_PelicanSave.zip
